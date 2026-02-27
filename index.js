@@ -1,158 +1,126 @@
-const { 
-    Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, 
-    ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, 
-    StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, 
-    TextInputStyle, InteractionType, REST, Routes 
-} = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType, REST, Routes } = require('discord.js');
 
 const client = new Client({ 
-    intents: [
-        GatewayIntentBits.Guilds, 
-        GatewayIntentBits.GuildMessages, 
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers
-    ] 
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] 
 });
 
-// --- CONFIGURAÇÕES ---
+// Variáveis de Ambiente do Railway
 const TOKEN = process.env.DISCORD_TOKEN;
-const ID_STAFF = '1452822605773148312';
-const CANAL_SETUP_FIXO = '1476773027516518470'; // Onde fica o painel
-const CANAL_LOGS_EQUIPE = '1476775424540282934'; // Recebimento da Staff
+const ID_STAFF = '1453126709447754010';
+const ID_CATEGORIA = process.env.ID_CATEGORIA; 
+const CANAL_TICKET_POST = '1476773027516518470';
+const CANAL_LOGS_DENUNCIA = '1476775424540282934';
 
-// Registro automático do Slash Command /setupsz
+// Registro automático do comando /setupsz
 client.once('ready', async () => {
+    console.log(`🚀 Ticket-SZ Online: ${client.user.tag}`);
     const commands = [{
         name: 'setupsz',
-        description: 'Posta o painel fixo de tickets (Tópicos Privados)',
+        description: 'Posta o painel de tickets no canal oficial',
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
     }];
     const rest = new REST({ version: '10' }).setToken(TOKEN);
     try {
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log(`🚀 Ticket-SZ Online: ${client.user.tag}`);
-    } catch (e) { console.error(e); }
+        console.log('✅ Comando /setupsz registrado!');
+    } catch (error) { console.error(error); }
 });
 
 client.on('interactionCreate', async (i) => {
-    // --- 1. PAINEL FIXO (/setupsz) ---
+    // --- COMANDO /SETUPSZ ---
     if (i.isChatInputCommand() && i.commandName === 'setupsz') {
-        if (i.channel.id !== CANAL_SETUP_FIXO) return i.reply({ content: `❌ Use em <#${CANAL_SETUP_FIXO}>`, ephemeral: true });
-
+        if (i.channel.id !== CANAL_TICKET_POST) return i.reply({ content: `❌ Use em <#${CANAL_TICKET_POST}>`, ephemeral: true });
         const embed = new EmbedBuilder()
             .setTitle('🎫 CENTRAL DE ATENDIMENTO - ALPHA')
-            .setDescription('Precisa de ajuda ou quer denunciar algo?\nUse o menu ou o botão abaixo para iniciar seu atendimento privado.')
+            .setDescription('Precisa de ajuda, fazer uma denúncia ou relatar uma falha?\nClique no botão abaixo para iniciar seu atendimento.')
             .setColor('#2b2d31');
+        const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('iniciar_ticket').setLabel('ABRIR TICKET').setEmoji('📩').setStyle(ButtonStyle.Success));
+        await i.reply({ content: '✅ Painel postado!', ephemeral: true });
+        await i.channel.send({ embeds: [embed], components: [row] });
+    }
 
-        const btn = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('abrir_tkt').setLabel('ABRIR TICKET').setEmoji('📩').setStyle(ButtonStyle.Success)
-        );
-
+    // --- BOTÃO INICIAL -> MENU DE CATEGORIAS ---
+    if (i.isButton() && i.customId === 'iniciar_ticket') {
         const menu = new ActionRowBuilder().addComponents(
-            new StringSelectMenuBuilder().setCustomId('menu_cat').setPlaceholder('Escolha a categoria rápida...')
+            new StringSelectMenuBuilder().setCustomId('menu_categoria').setPlaceholder('Escolha a categoria...')
                 .addOptions([
                     { label: 'BAN / KICK', value: 'cat_ban', emoji: '🔨' },
                     { label: 'FALHA EM AP', value: 'cat_ap', emoji: '💰' },
                     { label: 'FALHA EM SIMU', value: 'cat_simu', emoji: '🏆' }
                 ])
         );
-
-        await i.reply({ content: '✅ Painel postado!', ephemeral: true });
-        await i.channel.send({ embeds: [embed], components: [btn, menu] });
+        return i.reply({ content: 'Selecione a categoria:', components: [menu], ephemeral: true });
     }
 
-    // --- 2. RESPOSTA PRIVADA (EPHEMERAL) + ABERTURA DE TÓPICO ---
-    if ((i.isButton() && i.customId === 'abrir_tkt') || (i.isStringSelectMenu() && i.customId === 'menu_cat')) {
-        const tipo = i.values?.[0] || 'geral';
-        
-        // Criação da Thread Privada no canal do painel
-        const thread = await i.guild.channels.cache.get(CANAL_SETUP_FIXO).threads.create({
+    // --- CRIAÇÃO DO CANAL E MENU DE OCORRIDO ---
+    if (i.isStringSelectMenu() && i.customId === 'menu_categoria') {
+        const tipo = i.values[0];
+        const canal = await i.guild.channels.create({
             name: `sz-${tipo.replace('cat_', '')}-${i.user.username}`,
-            type: ChannelType.PrivateThread,
-            autoArchiveDuration: 60
+            type: ChannelType.GuildText,
+            parent: ID_CATEGORIA,
+            permissionOverwrites: [
+                { id: i.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                { id: i.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
+                { id: ID_STAFF, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
+            ]
         });
-
-        await thread.members.add(i.user.id);
 
         const embedTkt = new EmbedBuilder()
             .setTitle(`📩 ATENDIMENTO: ${tipo.replace('cat_', '').toUpperCase()}`)
-            .setDescription(`Olá ${i.user}, selecione o **OCORRIDO** abaixo para detalhar sua denúncia.\n\n📩 *Levaremos a situação para equipe, pode ser que entremos em contato.*`)
+            .setDescription(`Olá ${i.user}, selecione o **OCORRIDO** abaixo.\n\n📩 *Levaremos a situação para equipe, pode ser que entremos em contato.*`)
             .setColor('#5865F2');
 
-        const menuOcorrido = new ActionRowBuilder().addComponents(
-            new StringSelectMenuBuilder().setCustomId(`ocorrido_${tipo}`).setPlaceholder('Qual foi o ocorrido?')
-                .addOptions(tipo === 'cat_ban' ? [{ label: 'Xingamento', value: 'xing' }, { label: 'Mídia', value: 'midia' }, { label: 'Outro', value: 'outro' }] :
-                            tipo === 'cat_ap' ? [{ label: 'Vitória Errada', value: 'vit_ap' }, { label: 'Pagamento', value: 'pag_ap' }, { label: 'Outro', value: 'outro' }] :
-                            [{ label: 'Vitória Errada', value: 'vit_simu' }, { label: 'Favoritismo', value: 'fav' }, { label: 'Outro', value: 'outro' }])
-        );
+        let opcoes = tipo === 'cat_ban' ? [{ label: 'Xingamento', value: 'xingamento' }, { label: 'Mídia Inapropriada', value: 'midia' }, { label: 'Ameaça', value: 'ameaca' }, { label: 'Outro', value: 'outro_ban' }] :
+                     tipo === 'cat_ap' ? [{ label: 'Vitória Errada', value: 'vit_errada_ap' }, { label: 'Pagamento Errado', value: 'pag_errado' }, { label: 'Desrespeito', value: 'outro_ap' }] :
+                     [{ label: 'Vitória Errada', value: 'vit_errada_simu' }, { label: 'Favoritismo', value: 'favoritismo' }, { label: 'Desrespeito', value: 'outro_simu' }];
 
-        await thread.send({ content: `<@${i.user.id}> | <@&${ID_STAFF}>`, embeds: [embedTkt], components: [menuOcorrido] });
-        
-        // Resposta que SÓ O USUÁRIO VÊ no canal do painel
-        await i.reply({ content: `✅ Seu ticket foi aberto aqui: <#${thread.id}>`, ephemeral: true });
+        const menuOcorrido = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`ocorrido_${tipo}`).setPlaceholder('Qual foi o ocorrido?').addOptions(opcoes));
+        await canal.send({ content: `${i.user} | <@&${ID_STAFF}>`, embeds: [embedTkt], components: [menuOcorrido] });
+        await i.update({ content: `✅ Ticket criado: ${canal}`, components: [], ephemeral: true });
     }
 
-    // --- 3. FORMULÁRIO (MODAL) ---
+    // --- FORMULÁRIO (MODAL) ---
     if (i.isStringSelectMenu() && i.customId.startsWith('ocorrido_')) {
-        const modal = new ModalBuilder().setCustomId('modal_sz').setTitle('DETALHES DO OCORRIDO');
-        const qm = new TextInputBuilder().setCustomId('quem').setLabel("QUEM FOI?").setPlaceholder("Ex: @batata ou @picles").setStyle(TextInputStyle.Short).setRequired(true);
-        const rel = new TextInputBuilder().setCustomId('relato').setLabel("EXPLIQUE O OCORRIDO").setStyle(TextInputStyle.Paragraph).setRequired(true);
-        modal.addComponents(new ActionRowBuilder().addComponents(qm), new ActionRowBuilder().addComponents(rel));
+        const modal = new ModalBuilder().setCustomId('modal_detalhes').setTitle('DETALHES DO OCORRIDO');
+        const qmInput = new TextInputBuilder().setCustomId('quem').setLabel("QUEM FOI?").setPlaceholder(i.customId.includes('ap') || i.customId.includes('simu') ? "Ex: @picles" : "Ex: @batata").setStyle(TextInputStyle.Short).setRequired(true);
+        const descInput = new TextInputBuilder().setCustomId('relato').setLabel("EXPLIQUE O OCORRIDO").setStyle(TextInputStyle.Paragraph).setRequired(true);
+        modal.addComponents(new ActionRowBuilder().addComponents(qmInput), new ActionRowBuilder().addComponents(descInput));
         return await i.showModal(modal);
     }
 
-    // --- 4. RECEBER MODAL E ENVIAR LOG PARA EQUIPE ---
-    if (i.type === InteractionType.ModalSubmit && i.customId === 'modal_sz') {
+    // --- RECEBER FORMULÁRIO E LOGS ---
+    if (i.type === InteractionType.ModalSubmit && i.customId === 'modal_detalhes') {
         const quem = i.fields.getTextInputValue('quem');
         const relato = i.fields.getTextInputValue('relato');
-        const modo = i.channel.name.split('-')[1].toUpperCase();
 
-        const embedEquipe = new EmbedBuilder()
-            .setTitle(`🚨 DENÚNCIA: ${modo}`)
-            .addFields(
-                { name: '👤 Denunciador:', value: `<@${i.user.id}>`, inline: true },
-                { name: '👤 Acusado:', value: quem, inline: true },
-                { name: '📝 Relato:', value: relato }
-            ).setColor(modo === 'AP' ? '#ff0000' : '#f1c40f').setTimestamp();
+        const embedLog = new EmbedBuilder()
+            .setTitle('📝 RELATÓRIO DE DENÚNCIA')
+            .addFields({ name: '👤 Acusado:', value: quem, inline: true }, { name: '👤 Denunciador:', value: `<@${i.user.id}>`, inline: true }, { name: '📝 Relato:', value: relato })
+            .setColor('#f1c40f').setFooter({ text: '📩 Levaremos a situação para equipe...' });
 
-        const btnEquipe = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`fechar_${i.channel.id}`).setLabel('FECHAR TICKET').setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId(`dm_${i.user.id}`).setLabel('AVISAR RESOLVIDO (DM)').setStyle(ButtonStyle.Success)
-        );
+        const btnStaff = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`falar_${i.user.id}`).setLabel('FALAR COM DENUNCIADOR').setEmoji('💬').setStyle(ButtonStyle.Primary));
+        
+        const logChannel = i.guild.channels.cache.get(CANAL_LOGS_DENUNCIA);
+        if (logChannel) await logChannel.send({ embeds: [embedLog], components: [btnStaff] });
 
-        const logChan = i.guild.channels.cache.get(CANAL_LOGS_EQUIPE);
-        if (logChan) await logChan.send({ embeds: [embedEquipe], components: [btnEquipe] });
-
-        const btnFecharSimples = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('fechar_local').setLabel('FECHAR TICKET').setStyle(ButtonStyle.Danger));
-        await i.reply({ content: '✅ Relato enviado para a equipe! Aguarde o retorno.', embeds: [embedEquipe], components: [btnFecharSimples] });
+        const btnFechar = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('fechar_tkt').setLabel('FECHAR TICKET').setStyle(ButtonStyle.Danger));
+        await i.reply({ embeds: [embedLog], components: [btnFechar] });
     }
 
-    // --- 5. BOTÕES DE FECHAR E DM (LOGS E LOCAL) ---
-    if (i.isButton()) {
-        const parts = i.customId.split('_');
-        
-        // Fechar pelo canal de logs (Apaga Tópico + Apaga Mensagem de Log)
-        if (i.customId.startsWith('fechar_')) {
-            const threadAlvo = i.guild.channels.cache.get(parts[1]);
-            if (threadAlvo) await threadAlvo.delete().catch(() => {});
-            await i.message.delete().catch(() => {});
-            await i.reply({ content: '✅ Ticket encerrado e log limpo!', ephemeral: true });
-        }
+    // --- ABRIR TÓPICO PRIVADO (NOS LOGS) ---
+    if (i.isButton() && i.customId.startsWith('falar_')) {
+        const denunciadorId = i.customId.split('_')[1];
+        const thread = await i.channel.threads.create({ name: `conversa-${denunciadorId}`, type: ChannelType.PrivateThread });
+        await thread.members.add(i.user.id); await thread.members.add(denunciadorId);
+        await thread.send({ content: `👋 <@${denunciadorId}>, a Staff <@${i.user.id}> iniciou esta conversa privada sobre sua denúncia.` });
+        await i.reply({ content: `✅ Tópico criado: ${thread}`, ephemeral: true });
+    }
 
-        // Fechar pelo botão dentro do próprio tópico
-        if (i.customId === 'fechar_local') {
-            await i.reply('🔒 Fechando em 5 segundos...');
-            setTimeout(() => i.channel.delete().catch(() => {}), 5000);
-        }
-
-        // Enviar DM de resolvido
-        if (i.customId.startsWith('dm_')) {
-            try {
-                const user = await client.users.fetch(parts[1]);
-                await user.send(`✅ Olá! Sua denúncia no **Alpha** foi resolvida pela Staff. Obrigado!`);
-                await i.reply({ content: '✅ DM enviada!', ephemeral: true });
-            } catch (e) { await i.reply({ content: '❌ DM fechada!', ephemeral: true }); }
-        }
+    // --- FECHAR TICKET ---
+    if (i.isButton() && i.customId === 'fechar_tkt') {
+        await i.reply('🔒 Deletando em 5 segundos...');
+        setTimeout(() => i.channel.delete().catch(() => {}), 5000);
     }
 });
 
