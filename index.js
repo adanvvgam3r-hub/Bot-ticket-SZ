@@ -4,50 +4,62 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] 
 });
 
-const TOKEN = 'SEU_TOKEN_AQUI';
+// Variáveis de Ambiente do Railway
+const TOKEN = process.env.DISCORD_TOKEN;
 const ID_STAFF = '1453126709447754010';
-const ID_CATEGORIA = '1465842384586670254'; 
+const ID_CATEGORIA = process.env.ID_CATEGORIA; 
+const CANAL_TICKET_POST = '1476773027516518470';
 
 client.once('ready', () => console.log(`🚀 Ticket-SZ Online: ${client.user.tag}`));
 
-// Comando para postar o painel inicial (Digite !setup no canal)
+// Comando para postar o BOTÃO inicial
 client.on('messageCreate', async (msg) => {
-    if (msg.content === '!setup' && msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    if (msg.content === '!setup' && msg.channel.id === CANAL_TICKET_POST && msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
         const embed = new EmbedBuilder()
-            .setTitle('🎫 CENTRAL DE TICKETS - ALPHA')
-            .setDescription('Selecione a categoria do seu problema abaixo para abrir um chamado.')
+            .setTitle('🎫 CENTRAL DE ATENDIMENTO - ALPHA')
+            .setDescription('Precisa de ajuda, fazer uma denúncia ou relatar uma falha?\nClique no botão abaixo para iniciar seu atendimento.')
             .setColor('#2b2d31');
 
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('iniciar_ticket')
+                .setLabel('ABRIR TICKET')
+                .setEmoji('📩')
+                .setStyle(ButtonStyle.Success)
+        );
+
+        await msg.channel.send({ embeds: [embed], components: [row] });
+        msg.delete().catch(() => {});
+    }
+});
+
+client.on('interactionCreate', async (i) => {
+    // 1. Ao clicar no botão, mostra o menu de categorias
+    if (i.isButton() && i.customId === 'iniciar_ticket') {
         const menu = new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
                 .setCustomId('menu_categoria')
-                .setPlaceholder('Escolha a categoria...')
+                .setPlaceholder('Escolha a categoria do problema...')
                 .addOptions([
                     { label: 'BAN / KICK', value: 'cat_ban', emoji: '🔨' },
                     { label: 'FALHA EM AP', value: 'cat_ap', emoji: '💰' },
                     { label: 'FALHA EM SIMU', value: 'cat_simu', emoji: '🏆' }
                 ])
         );
-
-        await msg.channel.send({ embeds: [embed], components: [menu] });
-        msg.delete();
+        return i.reply({ content: 'Selecione a categoria abaixo:', components: [menu], ephemeral: true });
     }
-});
 
-client.on('interactionCreate', async (i) => {
-    // 1. Criação do Canal ao selecionar categoria
+    // 2. Criação do Canal Privado
     if (i.isStringSelectMenu() && i.customId === 'menu_categoria') {
         const tipo = i.values[0];
-        const nomeCanal = `sz-${tipo.replace('cat_', '')}-${i.user.username}`;
-
         const canal = await i.guild.channels.create({
-            name: nomeCanal,
+            name: `sz-${tipo.replace('cat_', '')}-${i.user.username}`,
             type: ChannelType.GuildText,
             parent: ID_CATEGORIA,
             permissionOverwrites: [
                 { id: i.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                { id: i.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
-                { id: ID_STAFF, allow: [PermissionFlagsBits.ViewChannel] }
+                { id: i.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
+                { id: ID_STAFF, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
             ]
         });
 
@@ -58,38 +70,22 @@ client.on('interactionCreate', async (i) => {
 
         let opcoes = [];
         if (tipo === 'cat_ban') {
-            opcoes = [
-                { label: 'Xingamento', value: 'xingamento' },
-                { label: 'Mídia Inapropriada', value: 'midia' },
-                { label: 'Ameaça', value: 'ameaca' },
-                { label: 'Outro', value: 'outro_ban' }
-            ];
+            opcoes = [{ label: 'Xingamento', value: 'xingamento' }, { label: 'Mídia Inapropriada', value: 'midia' }, { label: 'Ameaça', value: 'ameaca' }, { label: 'Outro', value: 'outro_ban' }];
         } else if (tipo === 'cat_ap') {
-            opcoes = [
-                { label: 'Vitória Errada', value: 'vit_errada_ap' },
-                { label: 'Pagamento Errado ou não efetuado', value: 'pag_errado' },
-                { label: 'Desrespeito', value: 'outro_ap' }
-            ];
+            opcoes = [{ label: 'Vitória Errada', value: 'vit_errada_ap' }, { label: 'Pagamento Errado', value: 'pag_errado' }, { label: 'Desrespeito', value: 'outro_ap' }];
         } else {
-            opcoes = [
-                { label: 'Vitória Errada', value: 'vit_errada_simu' },
-                { label: 'Favoritismo', value: 'favoritismo' },
-                { label: 'Desrespeito', value: 'outro_simu' }
-            ];
+            opcoes = [{ label: 'Vitória Errada', value: 'vit_errada_simu' }, { label: 'Favoritismo', value: 'favoritismo' }, { label: 'Desrespeito', value: 'outro_simu' }];
         }
 
         const menuOcorrido = new ActionRowBuilder().addComponents(
-            new StringSelectMenuBuilder()
-                .setCustomId(`ocorrido_${tipo}`)
-                .setPlaceholder('Qual foi o ocorrido?')
-                .addOptions(opcoes)
+            new StringSelectMenuBuilder().setCustomId(`ocorrido_${tipo}`).setPlaceholder('Qual foi o ocorrido?').addOptions(opcoes)
         );
 
         await canal.send({ content: `${i.user} | <@&${ID_STAFF}>`, embeds: [embedTkt], components: [menuOcorrido] });
-        await i.reply({ content: `✅ Ticket criado: ${canal}`, ephemeral: true });
+        await i.update({ content: `✅ Ticket criado: ${canal}`, components: [], ephemeral: true });
     }
 
-    // 2. Abrir Modal (Formulário) ao selecionar ocorrido
+    // 3. Modal de Detalhes
     if (i.isStringSelectMenu() && i.customId.startsWith('ocorrido_')) {
         const escolha = i.values[0];
         const modal = new ModalBuilder().setCustomId('modal_detalhes').setTitle('DETALHES DO OCORRIDO');
@@ -109,17 +105,14 @@ client.on('interactionCreate', async (i) => {
         return await i.showModal(modal);
     }
 
-    // 3. Receber Modal e finalizar
+    // 4. Receber Modal e Botão de Fechar
     if (i.type === InteractionType.ModalSubmit && i.customId === 'modal_detalhes') {
         const quem = i.fields.getTextInputValue('quem');
         const relato = i.fields.getTextInputValue('relato');
 
         const embedFinal = new EmbedBuilder()
             .setTitle('📝 RELATÓRIO DE DENÚNCIA')
-            .addFields(
-                { name: '👤 Acusado:', value: quem, inline: true },
-                { name: '📝 Relato:', value: relato }
-            )
+            .addFields({ name: '👤 Acusado:', value: quem, inline: true }, { name: '📝 Relato:', value: relato })
             .setColor('#f1c40f')
             .setFooter({ text: '📩 Levaremos a situação para equipe, pode ser que entremos em contato.' });
 
@@ -130,7 +123,6 @@ client.on('interactionCreate', async (i) => {
         await i.reply({ embeds: [embedFinal], components: [btnFechar] });
     }
 
-    // 4. Fechar Ticket
     if (i.isButton() && i.customId === 'fechar_tkt') {
         await i.reply('🔒 O ticket será deletado em 5 segundos...');
         setTimeout(() => i.channel.delete().catch(() => {}), 5000);
