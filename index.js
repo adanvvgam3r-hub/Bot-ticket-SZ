@@ -212,8 +212,12 @@ client.on('interactionCreate', async (i) => {
         const [_, cat, sub] = i.customId.split('|');
         
         const dataFields = i.fields.fields.map(f => {
-            return `**${f.label}:** ${f.value}`;
-        }).join('\n');
+    // Garante que o label e o value existam antes de montar a string
+    const pergunta = f.label || "Campo";
+    const resposta = f.value || "Não informado";
+    return `**${pergunta}:** ${resposta}`;
+}).join('\n');
+
 
         const embedLog = new EmbedBuilder()
             .setTitle(`🚨 Nova Denúncia | @「 STAFF 」`)
