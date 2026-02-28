@@ -28,7 +28,7 @@ process.on('uncaughtException', (err) => { console.error(err); });
 async function createTranscript(channel, user) {
     try {
         const messages = await channel.messages.fetch({ limit: 100 });
-        let log = `RELATÓRIO DE AUDITORIA ALPHA\n`;
+        let log = `RELATÓRIO DE AUDITORIA SZ\n`;
         log += `Ticket: ${channel.name}\nUsuário: ${user.tag} (${user.id})\n`;
         log += `Data: ${new Date().toLocaleString()}\n`;
         log += `--------------------------------------------------\n\n`;
@@ -47,11 +47,11 @@ async function createTranscript(channel, user) {
 
 client.once('ready', async () => {
     console.log(`Logado: ${client.user.tag}`);
-    client.user.setActivity('Tickets Alpha 2026', { type: ActivityType.Watching });
+    client.user.setActivity('Tickets sz 2026', { type: ActivityType.Watching });
 
     const commands = [{
         name: 'setupsz',
-        description: 'Posta o painel de tickets Alpha',
+        description: 'Posta o painel de tickets SZ',
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
     }];
 
@@ -68,17 +68,17 @@ client.on('interactionCreate', async (i) => {
         }
 
         const embedMain = new EmbedBuilder()
-            .setTitle('🎫 CENTRAL DE ATENDIMENTO - ALPHA')
-            .setDescription('Selecione a categoria no menu e clique no botão para iniciar seu ticket.\n\n🔒 **Privacidade:** A primeira etapa é um tópico privado entre você e o bot.')
+            .setTitle('🎫 CENTRAL DE ATENDIMENTO - **SZ**')
+            .setDescription('Selecione a categoria no menu e clique no botão para iniciar seu ticket.\n\n🔒 **Privacidade:** A sua privacidade e muito importante.')
             .setColor('#2b2d31')
-            .setFooter({ text: 'Alpha Supreme System' });
+            .setFooter({ text: 'Adan developer' });
 
         const menuMain = new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder().setCustomId('main_select').setPlaceholder('Escolha a categoria principal...')
                 .addOptions([
                     { label: 'BAN / KICK', value: 'CAT_BAN', emoji: '🔨' },
                     { label: 'SIMU (Simulados)', value: 'CAT_SIMU', emoji: '🏆' },
-                    { label: 'FALHA EM AP', value: 'CAT_AP', emoji: '💰' }
+                    { label: 'APOSTADO', value: 'CAT_AP', emoji: '💰' }
                 ])
         );
 
@@ -141,7 +141,7 @@ client.on('interactionCreate', async (i) => {
             const btnCancel = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('cancel_ticket').setLabel('CANCELAR').setStyle(ButtonStyle.Danger));
 
             await threadSolo.send({ content: `👋 ${i.user}, você selecionou **${cat.replace('CAT_', '')}**.\nSelecione o ocorrido abaixo para abrir o formulário:`, components: [rowSub, btnCancel] });
-            return i.reply({ content: `✅ Tópico de coleta privado: ${threadSolo}`, ephemeral: true });
+            return i.reply({ content: `✅ Sua resposta foi levada a equipe: ${threadSolo}`, ephemeral: true });
 
         } catch (e) {
             return i.reply({ content: '❌ Erro ao criar tópico. Verifique as permissões.', ephemeral: true });
@@ -194,9 +194,9 @@ client.on('interactionCreate', async (i) => {
             );
         } else if (sub === 'Valor não pago') {
             modal.addComponents(
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('v1').setLabel("QUEM?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('v2').setLabel("QUAL VALOR?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('v3').setLabel("PORQUE NÃO PAGOU?").setStyle(TextInputStyle.Paragraph).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('y1').setLabel("QUEM?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('y2').setLabel("QUAL VALOR?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('y3').setLabel("PORQUE ELE NÃO PAGOU?").setStyle(TextInputStyle.Paragraph).setRequired(true))
             );
         } else {
             modal.addComponents(
@@ -220,9 +220,16 @@ client.on('interactionCreate', async (i) => {
         'q2': 'DONO DA COPA',
         'c1': 'O QUE FOI FALADO',
         'c2': 'O QUE ACONTECEU',
+        'c3': 'QUEM FOI O MENTIROSO?',
+        'c4': 'DONO DA COPA?',
         'v1': 'VALOR',
         'v2': 'VALOR PROPOSTO',
-        'v3': 'VALOR PAGO'
+        'v3': 'VALOR PAGO',
+        'x1': 'O QUE OCORREU?',
+        'x2': 'RELATO COMPLETO',
+        'y1': 'QUEM?',
+        'y2': 'QUAL VALOR?',
+        'y3': 'PORQUE ELE NÃO PAGOU?'
     };
 
     // Pega o nome do dicionário acima ou usa o ID como fallback
@@ -278,13 +285,13 @@ const threadInteracao = await canalDestino.threads.create({
         }
 
         if (act === 'done') {
-            if (user) await user.send(`✅ **Alpha Atendimento:** Seu caso foi analisado e marcado como **RESOLVIDO**.`).catch(() => {});
+            if (user) await user.send(`✅ **SZ Atendimento:** Seu caso foi analisado e tomamos medidas\n\n Obrigado pela denuncia.`).catch(() => {});
             await i.update({ content: `✅ **RESOLVIDO** por <@${i.user.id}>`, components: [], embeds: i.message.embeds });
             cooldownSystem.delete(uid);
         }
 
         if (act === 'fail') {
-            if (user) await user.send(`❌ **Alpha Atendimento:** Analisamos seu caso, mas não houve evidências suficientes.`).catch(() => {});
+            if (user) await user.send(`❌ **SZ Atendimento:** Analisamos seu caso, mas não houve evidências suficientes.`).catch(() => {});
             await i.update({ content: `❌ **INSUFICIENTE** por <@${i.user.id}>`, components: [], embeds: i.message.embeds });
             cooldownSystem.delete(uid);
         }
@@ -300,7 +307,7 @@ const threadInteracao = await canalDestino.threads.create({
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath); 
             i.channel.delete().catch(() => {}); 
             cooldownSystem.delete(uid); 
-        }, 5000);
+        }, 2000);
     }
 });
 
