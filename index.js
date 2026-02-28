@@ -212,7 +212,22 @@ client.on('interactionCreate', async (i) => {
         const [_, cat, sub] = i.customId.split('|');
         
         const dataFields = i.fields.fields.map(f => {
-    return `**${f.label}:** ${f.value}`;
+    // Mapeia o ID interno para o nome real da pergunta
+    const nomes = {
+        'q': 'QUEM FOI',
+        'm': 'RELATO/MENSAGEM',
+        'q1': 'AJUDADO',
+        'q2': 'DONO DA COPA',
+        'c1': 'O QUE FOI FALADO',
+        'c2': 'O QUE ACONTECEU',
+        'v1': 'VALOR',
+        'v2': 'VALOR PROPOSTO',
+        'v3': 'VALOR PAGO'
+    };
+
+    // Pega o nome do dicionário acima ou usa o ID como fallback
+    const pergunta = nomes[f.customId] || f.customId.toUpperCase();
+    return `**${pergunta}:** ${f.value}`;
 }).join('\n');
 
 
