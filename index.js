@@ -69,7 +69,16 @@ client.on('interactionCreate', async (i) => {
 
         const embedMain = new EmbedBuilder()
             .setTitle('🎫 CENTRAL DE ATENDIMENTO - **SZ**')
-            .setDescription('Selecione a categoria no menu e clique no botão para iniciar seu ticket.\n\n🔒 **Privacidade:** A sua privacidade e muito importante.')
+            .setDescription(
+                '### 🛡️ Seus problemas na SZ acabaram!\n' +
+                'Selecione a categoria abaixo para iniciar seu atendimento especializado.\n\n' +
+                '**⛔ BAN / KICK**\n' +
+                'É o canal direto para denúncias de infrações graves, como xingamentos, fotos inapropriadas ou ameaças, garantindo punições rápidas e justas.\n\n' +
+                '**🏆 SIMU (Simulados)**\n' +
+                'Focado na organização de torneios, resolve pendências de favoritismo, partidas repetidas ou erros de pontuação, mantendo a integridade interna.\n\n' +
+                '**💰 APOSTADO**\n' +
+                'Centraliza conflitos financeiros e de desrespeito em partidas valendo dinheiro, tratando casos de valores não pagos ou quantias erradas com suporte rígido.'
+            )
             .setColor('#2b2d31')
             .setFooter({ text: 'Adan developer' });
 
