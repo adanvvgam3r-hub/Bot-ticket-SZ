@@ -85,7 +85,7 @@ client.on('interactionCreate', async (i) => {
         const menuMain = new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder().setCustomId('main_select').setPlaceholder('Escolha a categoria principal...')
                 .addOptions([
-                    { label: 'BAN / KICK', value: 'CAT_BAN', emoji: '🔨' },
+                    { label: 'BAN / KICK', value: 'CAT_BAN', emoji: '⛔' },
                     { label: 'SIMU (Simulados)', value: 'CAT_SIMU', emoji: '🏆' },
                     { label: 'APOSTADO', value: 'CAT_AP', emoji: '💰' }
                 ])
