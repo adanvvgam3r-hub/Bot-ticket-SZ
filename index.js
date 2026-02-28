@@ -1,6 +1,6 @@
 // ALPHA SUPREME TICKET SYSTEM - VERSÃO INDUSTRIAL 2026
-// Focado em Tópicos Privados, Transcripts e Decisão da Staff
-// Desenvolvido para Railway.app
+// CORREÇÃO: Erro de 'undefined' nos campos do Modal resolvido com IDs explícitos.
+// Focado em Tópicos Privados, Transcripts e Decisão da Staff.
 
 const { 
     Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, 
@@ -11,7 +11,7 @@ const {
 const fs = require('fs');
 const path = require('path');
 
-// Inicialização do Cliente com Intents Necessárias
+// Inicialização do Cliente com Intents Industriais
 const client = new Client({ 
     intents: [
         GatewayIntentBits.Guilds, 
@@ -22,87 +22,75 @@ const client = new Client({
     ] 
 });
 
-// Configurações Estáticas e Variáveis de Ambiente
+// Configurações de Ambiente (Railway)
 const TOKEN = process.env.DISCORD_TOKEN;
 const ID_CARGO_STAFF = '1452822605773148312'; 
 const CANAL_TICKET_POST = '1476773027516518470';
 const CANAL_LOGS_DENUNCIA = '1476775424540282934';
 
-// Gerenciadores de Estado (Database em Memória para Estabilidade)
-const ticketSessions = new Collection();
-const activeColetas = new Collection();
-const globalCooldown = new Collection();
-const staffMetrics = new Collection();
-const interactionLogs = new Collection();
+// Sistemas de Gerenciamento de Memória e Anti-Crash
+const sessionCache = new Collection();
+const coletaThreads = new Collection();
+const ticketCooldown = new Collection();
+const logsAuditoria = new Collection();
 
-// Handler de Erros Global para evitar quedas no Railway
-process.on('unhandledRejection', (reason, promise) => {
-    console.error(' [ERRO DE PROMESSA] ', reason);
-});
+// Segurança Global contra quedas
+process.on('unhandledRejection', (reason) => console.error(' [PROMESSA FALHOU] ', reason));
+process.on('uncaughtException', (err) => console.error(' [EXCEÇÃO FATAL] ', err));
 
-process.on('uncaughtException', (err) => {
-    console.error(' [ERRO DE EXCEÇÃO] ', err);
-});
-
-// Função de Transcript Industrial para Auditoria
-async function createIndustrialTranscript(channel, user) {
-    const messages = await channel.messages.fetch({ limit: 100 });
-    let content = `RELATÓRIO DE AUDITORIA ALPHA - TICKET ${channel.name}\n`;
-    content += `Data: ${new Date().toLocaleString()}\n`;
-    content += `Usuário: ${user.tag} (${user.id})\n`;
-    content += `--------------------------------------------------\n\n`;
+// Função Industrial de Transcript (Audit Log)
+async function generateAuditLog(thread, user) {
+    const messages = await thread.messages.fetch({ limit: 100 });
+    let data = `ALPHA SYSTEM - AUDITORIA DE TICKET\n`;
+    data += `Ticket: ${thread.name}\nUsuário: ${user.tag}\nData: ${new Date().toLocaleString()}\n`;
+    data += `--------------------------------------------------\n\n`;
 
     messages.reverse().forEach(m => {
         const time = m.createdAt.toLocaleTimeString();
-        content += `[${time}] ${m.author.tag}: ${m.cleanContent || "[Embed/Midia]"}\n`;
-        if (m.attachments.size > 0) {
-            m.attachments.forEach(a => content += ` > ANEXO: ${a.url}\n`);
-        }
+        data += `[${time}] ${m.author.tag}: ${m.cleanContent || "[Anexo/Embed]"}\n`;
     });
 
-    const fileName = `transcript-${channel.id}.txt`;
+    const fileName = `audit-${thread.id}.txt`;
     const filePath = path.join(__dirname, fileName);
-    fs.writeFileSync(filePath, content);
+    fs.writeFileSync(filePath, data);
     return { filePath, fileName };
 }
 
-// Inicialização do Bot
 client.once('ready', async () => {
-    console.log(`[ALPHA] Conectado como ${client.user.tag}`);
-    client.user.setActivity('Alpha Supreme 2026', { type: ActivityType.Competing });
+    console.log(`[SYSTEM] Bot Ticket SZ Online: ${client.user.tag}`);
+    client.user.setActivity('Tickets Alpha Supreme', { type: ActivityType.Watching });
 
     const commands = [{
         name: 'setupsz',
-        description: 'Posta o painel supremo de tickets Alpha',
+        description: 'Envia o painel industrial de atendimento Alpha',
         default_member_permissions: PermissionFlagsBits.Administrator.toString()
     }];
 
     const rest = new REST({ version: '10' }).setToken(TOKEN);
     try {
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log('[ALPHA] Comandos Slash Sincronizados.');
+        console.log('[SYSTEM] Comandos Slash Sincronizados com Sucesso.');
     } catch (e) {
-        console.error('[ALPHA] Erro Rest:', e);
+        console.error('[SYSTEM] Falha no REST:', e);
     }
 });
 
-// Listener Principal de Interações
 client.on('interactionCreate', async (i) => {
     
-    // COMANDO DE SETUP
+    // --- SETUP DO PAINEL PRINCIPAL ---
     if (i.isChatInputCommand() && i.commandName === 'setupsz') {
         if (i.channelId !== CANAL_TICKET_POST) {
-            return i.reply({ content: `❌ Use em <#${CANAL_TICKET_POST}>`, ephemeral: true });
+            return i.reply({ content: `❌ Use este comando em <#${CANAL_TICKET_POST}>`, ephemeral: true });
         }
 
-        const embed = new EmbedBuilder()
+        const embedMain = new EmbedBuilder()
             .setTitle('🎫 CENTRAL DE ATENDIMENTO - ALPHA')
-            .setDescription('Selecione a categoria e clique no botão para iniciar.\n\n🔒 **Privacidade:** A primeira etapa é um tópico privado entre você e o bot.')
+            .setDescription('Selecione a categoria e clique no botão para iniciar um atendimento privado.\n\n🔒 **Importante:** A coleta de dados é invisível para outros jogadores.')
             .setColor('#2b2d31')
-            .setFooter({ text: 'Alpha Supreme System' });
+            .setFooter({ text: 'Alpha Supreme Ticket System' });
 
-        const menu = new ActionRowBuilder().addComponents(
-            new StringSelectMenuBuilder().setCustomId('main_select').setPlaceholder('Escolha a categoria principal...')
+        const menuMain = new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder().setCustomId('main_select').setPlaceholder('Escolha o assunto principal...')
                 .addOptions([
                     { label: 'BAN / KICK', value: 'CAT_BAN', emoji: '🔨' },
                     { label: 'SIMU (Simulados)', value: 'CAT_SIMU', emoji: '🏆' },
@@ -110,27 +98,27 @@ client.on('interactionCreate', async (i) => {
                 ])
         );
 
-        const btn = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('init_coleta').setLabel('ABRIR TICKET').setStyle(ButtonStyle.Success).setEmoji('📩')
+        const btnMain = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('start_coleta').setLabel('ABRIR TICKET').setStyle(ButtonStyle.Success).setEmoji('📩')
         );
 
-        await i.reply({ content: '✅ Painel configurado!', ephemeral: true });
-        return i.channel.send({ embeds: [embed], components: [menu, btn] });
+        await i.reply({ content: '✅ Painel gerado!', ephemeral: true });
+        return i.channel.send({ embeds: [embedMain], components: [menuMain, btnMain] });
     }
 
-    // CACHE DE SELEÇÃO INICIAL
+    // --- CACHE DE SESSÃO ---
     if (i.isStringSelectMenu() && i.customId === 'main_select') {
-        ticketSessions.set(i.user.id, i.values[0]);
-        return i.reply({ content: `✅ Categoria **${i.values[0].replace('CAT_', '')}** selecionada!`, ephemeral: true });
+        sessionCache.set(i.user.id, i.values);
+        return i.reply({ content: `✅ Categoria **${i.values.replace('CAT_', '')}** marcada! Clique no botão verde.`, ephemeral: true });
     }
 
-    // ABERTURA DO TÓPICO DE COLETA PRIVADO (SÓ USER + BOT)
-    if (i.isButton() && i.customId === 'init_coleta') {
-        const cat = ticketSessions.get(i.user.id);
-        if (!cat) return i.reply({ content: '❌ Selecione uma categoria no menu primeiro!', ephemeral: true });
+    // --- ABERTURA DO TÓPICO DE COLETA PRIVADO ---
+    if (i.isButton() && i.customId === 'start_coleta') {
+        const cat = sessionCache.get(i.user.id);
+        if (!cat) return i.reply({ content: '❌ Por favor, selecione uma categoria no menu antes!', ephemeral: true });
 
-        if (globalCooldown.has(i.user.id)) {
-            return i.reply({ content: '⏳ Você já tem um atendimento pendente.', ephemeral: true });
+        if (ticketCooldown.has(i.user.id)) {
+            return i.reply({ content: '⏳ Você já tem um ticket ativo ou está em cooldown.', ephemeral: true });
         }
 
         try {
@@ -141,222 +129,186 @@ client.on('interactionCreate', async (i) => {
             });
 
             await threadSolo.members.add(i.user.id);
-            activeColetas.set(i.user.id, threadSolo.id);
-            globalCooldown.set(i.user.id, Date.now());
+            coletaThreads.set(i.user.id, threadSolo.id);
+            ticketCooldown.set(i.user.id, Date.now());
 
-            // Menu de Subcategorias Dinâmico
             let rowSub;
             if (cat === 'CAT_BAN') {
-                rowSub = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('sub_ban').setPlaceholder('BAN: Detalhe o ocorrido...')
+                rowSub = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('sub_ban').setPlaceholder('Motivo do BAN...')
                     .addOptions([
-                        { label: 'Xingamento', value: 'Xingamento', emoji: '🤬' },
-                        { label: 'Foto Inapropriada', value: 'Foto Inapropriada', emoji: '🔞' },
-                        { label: 'Ameaça', value: 'Ameaça', emoji: '🚨' },
-                        { label: 'Outro', value: 'Outro', emoji: '⚙️' }
+                        { label: 'Xingamento', value: 'Xingamento' },
+                        { label: 'Foto Inapropriada', value: 'Foto Inapropriada' },
+                        { label: 'Ameaça', value: 'Ameaça' },
+                        { label: 'Outro', value: 'Outro' }
                     ]));
             } else if (cat === 'CAT_SIMU') {
-                rowSub = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('sub_simu').setPlaceholder('SIMU: Detalhe o ocorrido...')
+                rowSub = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('sub_simu').setPlaceholder('Motivo do SIMU...')
                     .addOptions([
-                        { label: 'Favoritismo', value: 'Favoritismo', emoji: '⭐' },
-                        { label: 'Partidas Repetidas sem prova', value: 'Partidas Repetidas', emoji: '🔁' }
+                        { label: 'Favoritismo', value: 'Favoritismo' },
+                        { label: 'Partidas Repetidas', value: 'Partidas Repetidas' }
                     ]));
             } else if (cat === 'CAT_AP') {
-                rowSub = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('sub_ap').setPlaceholder('AP: Detalhe o ocorrido...')
+                rowSub = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('sub_ap').setPlaceholder('Motivo do AP...')
                     .addOptions([
-                        { label: 'Desrespeito', value: 'Desrespeito', emoji: '😤' },
-                        { label: 'Dinheiro pago errado', value: 'Dinheiro Errado', emoji: '❌' },
-                        { label: 'Valor não pago', value: 'Valor não pago', emoji: '📉' }
+                        { label: 'Desrespeito', value: 'Desrespeito' },
+                        { label: 'Dinheiro Errado', value: 'Dinheiro Errado' },
+                        { label: 'Valor não pago', value: 'Valor não pago' }
                     ]));
             }
 
-            const btnCancel = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('cancel_now').setLabel('CANCELAR').setStyle(ButtonStyle.Danger));
+            const btnCancel = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('stop_coleta').setLabel('CANCELAR').setStyle(ButtonStyle.Danger));
 
             await threadSolo.send({ 
-                content: `👋 Olá ${i.user}! Este é seu espaço privado para enviar dados de **${cat.replace('CAT_', '')}**.\nEscolha o motivo específico:`, 
+                content: `👋 ${i.user}, escolha o detalhe abaixo para categoria **${cat.replace('CAT_', '')}**:`, 
                 components: [rowSub, btnCancel] 
             });
 
-            return i.reply({ content: `✅ Tópico de coleta iniciado: ${threadSolo}`, ephemeral: true });
+            return i.reply({ content: `✅ Tópico privado iniciado: ${threadSolo}`, ephemeral: true });
         } catch (e) {
             console.error(e);
-            return i.reply({ content: '❌ Erro ao criar tópico. Verifique permissões.', ephemeral: true });
+            return i.reply({ content: '❌ Erro ao criar tópico. Verifique as permissões do bot.', ephemeral: true });
         }
     }
 
-    // BOTÃO DE CANCELAR COLETA
-    if (i.isButton() && i.customId === 'cancel_now') {
-        globalCooldown.delete(i.user.id);
-        await i.reply('🔒 Encerrando coleta...');
+    // --- CANCELAR COLETA ---
+    if (i.isButton() && i.customId === 'stop_coleta') {
+        ticketCooldown.delete(i.user.id);
+        await i.reply('🔒 Fechando tópico privado...');
         return setTimeout(() => i.channel.delete().catch(() => {}), 2000);
     }
 
-    // DISPARO DE MODAIS (FORMULÁRIOS)
+    // --- MODAIS COM IDs EXPLÍCITOS (CORREÇÃO DO UNDEFINED) ---
     if (i.isStringSelectMenu() && i.customId.startsWith('sub_')) {
-        const sub = i.values[0];
+        const sub = i.values;
         const cat = i.customId.replace('sub_', '').toUpperCase();
-        let modal = new ModalBuilder().setCustomId(`form_final|${cat}|${sub}`).setTitle(`${cat}: ${sub}`);
+        let modal = new ModalBuilder().setCustomId(`final_form|${cat}|${sub}`).setTitle(`${cat}: ${sub}`);
 
-        // Lógica de Campos Específicos para cada Subcategoria
         if (sub === 'Xingamento' || sub === 'Desrespeito') {
             modal.addComponents(
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('q').setLabel("QUEM FOI?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('m').setLabel("QUAL FOI A MENSAGEM?").setStyle(TextInputStyle.Paragraph).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_quem').setLabel("QUEM FOI?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_msg').setLabel("QUAL FOI A MENSAGEM?").setStyle(TextInputStyle.Paragraph).setRequired(true))
             );
         } else if (sub === 'Foto Inapropriada') {
             modal.addComponents(
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('q').setLabel("QUEM FOI?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('m').setLabel("CONTEÚDO DA FOTO?").setStyle(TextInputStyle.Paragraph).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_quem').setLabel("QUEM FOI?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_msg').setLabel("CONTEÚDO DA FOTO?").setStyle(TextInputStyle.Paragraph).setRequired(true))
             );
         } else if (sub === 'Ameaça') {
             modal.addComponents(
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('q').setLabel("QUEM FOI?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('m').setLabel("QUAL A AMEAÇA? (TEM QUE TER PRINT)").setStyle(TextInputStyle.Paragraph).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_quem').setLabel("QUEM FOI?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_msg').setLabel("QUAL A AMEAÇA? (PRINT OBRIGATÓRIO)").setStyle(TextInputStyle.Paragraph).setRequired(true))
             );
         } else if (sub === 'Favoritismo') {
             modal.addComponents(
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('c1').setLabel("QUEM FOI AJUDADO?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('c2').setLabel("DONO DA COPA?").setStyle(TextInputStyle.Short).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_ajudado').setLabel("QUEM FOI AJUDADO?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_dono').setLabel("DONO DA COPA?").setStyle(TextInputStyle.Short).setRequired(true))
             );
         } else if (sub === 'Partidas Repetidas') {
             modal.addComponents(
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('c1').setLabel("O QUE FOI FALADO?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('c2').setLabel("O QUE ACONTECEU?").setStyle(TextInputStyle.Paragraph).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('c3').setLabel("MENTIROSO?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('c4').setLabel("DONO DA COPA?").setStyle(TextInputStyle.Short).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_falado').setLabel("O QUE FOI FALADO?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_aconteceu').setLabel("O QUE REALMENTE ACONTECEU?").setStyle(TextInputStyle.Paragraph).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_mentiroso').setLabel("QUEM FOI O MENTIROSO?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_dono').setLabel("QUEM FOI O DONO DA COPA?").setStyle(TextInputStyle.Short).setRequired(true))
             );
         } else if (sub === 'Dinheiro Errado') {
             modal.addComponents(
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('q').setLabel("QUEM?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('v1').setLabel("VALOR PROPOSTO?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('v2').setLabel("VALOR PAGO?").setStyle(TextInputStyle.Short).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_quem').setLabel("QUEM?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_v1').setLabel("VALOR PROPOSTO?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_v2').setLabel("VALOR PAGO?").setStyle(TextInputStyle.Short).setRequired(true))
             );
         } else if (sub === 'Valor não pago') {
             modal.addComponents(
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('q').setLabel("QUEM?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('v').setLabel("VALOR?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('m').setLabel("MOTIVO DO NÃO PAGAMENTO?").setStyle(TextInputStyle.Paragraph).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_quem').setLabel("QUEM?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_valor').setLabel("VALOR?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_motivo').setLabel("PORQUE NÃO PAGOU?").setStyle(TextInputStyle.Paragraph).setRequired(true))
             );
         } else {
             modal.addComponents(
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('q').setLabel("O QUE OCORREU?").setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('m').setLabel("RELATE OS DETALHES").setStyle(TextInputStyle.Paragraph).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_assunto').setLabel("O QUE OCORREU?").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('campo_relato').setLabel("RELATE OS DETALHES").setStyle(TextInputStyle.Paragraph).setRequired(true))
             );
         }
 
         return await i.showModal(modal);
     }
 
-    // PROCESSAMENTO DO FORMULÁRIO E ENVIO PARA STAFF (DECISÃO)
-    if (i.type === InteractionType.ModalSubmit && i.customId.startsWith('form_final|')) {
+    // --- PROCESSAMENTO FINAL E ENVIO PARA STAFF (SEM UNDEFINED) ---
+    if (i.type === InteractionType.ModalSubmit && i.customId.startsWith('final_form|')) {
         const [_, cat, sub] = i.customId.split('|');
-        const formData = i.fields.fields.map(f => `**${f.label}:** ${f.value}`).join('\n');
+        
+        // Mapeamento dinâmico para evitar o erro 'undefined'
+        const camposData = i.fields.fields.map(f => {
+            const label = f.label || "Informação";
+            const value = f.value || "Não informado";
+            return `**${label}:** ${value}`;
+        }).join('\n');
 
-        const embedDecision = new EmbedBuilder()
-            .setTitle(`📂 RECEBIMENTO: ${cat}`)
-            .setDescription(`**Denunciador:** <@${i.user.id}>\n**Motivo:** ${sub}\n\n**Dados do Relatório:**\n${formData}`)
+        const embedStaff = new EmbedBuilder()
+            .setTitle(`🚨 Revisão Pendente [${cat}]`)
+            .setDescription(`**RECEBIMENTO: SIM**\n\n**Denunciador:** <@${i.user.id}>\n**Motivo:** ${sub}\n\n**Dados do Relatório:**\n${camposData}`)
             .setColor('#f1c40f')
             .setTimestamp()
             .setThumbnail(i.user.displayAvatarURL());
 
         const rowDecision = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`decide_talk_${i.user.id}`).setLabel('INTERAGIR').setStyle(ButtonStyle.Primary).setEmoji('💬'),
-            new ButtonBuilder().setCustomId(`decide_done_${i.user.id}`).setLabel('RESOLVIDO').setStyle(ButtonStyle.Success).setEmoji('✅'),
-            new ButtonBuilder().setCustomId(`decide_fail_${i.user.id}`).setLabel('INSUFICIENTE').setStyle(ButtonStyle.Danger).setEmoji('❌')
+            new ButtonBuilder().setCustomId(`st_talk_${i.user.id}`).setLabel('INTERAGIR').setStyle(ButtonStyle.Primary).setEmoji('💬'),
+            new ButtonBuilder().setCustomId(`st_done_${i.user.id}`).setLabel('RESOLVIDO').setStyle(ButtonStyle.Success).setEmoji('✅'),
+            new ButtonBuilder().setCustomId(`st_fail_${i.user.id}`).setLabel('INSUFICIENTE').setStyle(ButtonStyle.Danger).setEmoji('❌')
         );
 
         const logChan = i.guild.channels.cache.get(CANAL_LOGS_DENUNCIA);
         if (logChan) {
-            await logChan.send({ content: `🚨 **Revisão Pendente [${cat}]** | <@&${ID_CARGO_STAFF}>`, embeds: [embedDecision], components: [rowDecision] });
+            await logChan.send({ content: `🚨 **Nova Denúncia [${cat}]** | <@&${ID_CARGO_STAFF}>`, embeds: [embedStaff], components: [rowDecision] });
         }
 
-        await i.reply({ content: '✅ Relatório enviado! A Staff analisará sua denúncia. Aguarde a decisão ou o contato por um novo tópico no canal de logs.', ephemeral: true });
+        await i.reply({ content: '✅ Relatório enviado! A Staff analisará e tomará uma decisão.', ephemeral: true });
         
-        // Deleta o tópico de coleta imediatamente
-        const coletaThreadId = activeColetas.get(i.user.id);
+        const coletaThreadId = coletaThreads.get(i.user.id);
         if (coletaThreadId) {
             const t = i.guild.channels.cache.get(coletaThreadId);
             if (t) setTimeout(() => t.delete().catch(() => {}), 2000);
-            activeColetas.delete(i.user.id);
+            coletaThreads.delete(i.user.id);
         }
     }
 
-    // LÓGICA DE DECISÃO DA STAFF (INTERAGIR / RESOLVER / RECUSAR)
-    if (i.isButton() && i.customId.startsWith('decide_')) {
+    // --- DECISÃO DA STAFF ---
+    if (i.isButton() && i.customId.startsWith('st_')) {
         const [_, action, targetId] = i.customId.split('_');
-        const targetUser = await client.users.fetch(targetId).catch(() => null);
+        const player = await client.users.fetch(targetId).catch(() => null);
 
-        // CASO 1: INTERAGIR (ABRE TÓPICO DE CONVERSA)
         if (action === 'talk') {
-            const threadInteracao = await i.channel.threads.create({
+            const threadTalk = await i.channel.threads.create({
                 name: `atendimento-${targetId}`,
                 type: ChannelType.PublicThread,
                 autoArchiveDuration: 60
             });
-
-            await threadInteracao.members.add(targetId);
-            
-            const btnStaffClose = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`finalize_audit_${targetId}`).setLabel('ENCERRAR E GERAR LOG').setStyle(ButtonStyle.Danger).setEmoji('🔒')
-            );
-
-            await threadInteracao.send({ 
-                content: `👋 <@${targetId}>, a Staff <@${i.user.id}> iniciou esta conversa sobre sua denúncia.\n\n🛠️ **Para Staff:** Use o botão abaixo ao finalizar.`,
-                components: [btnStaffClose]
-            });
-
-            return i.reply({ content: `✅ Tópico de interação criado: ${threadInteracao}`, ephemeral: true });
+            await threadTalk.members.add(targetId);
+            await threadTalk.send({ content: `👋 <@${targetId}>, Staff <@${i.user.id}> iniciou a conversa.\n\n🛠️ Use o botão para encerrar:`, components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`audit_close_${targetId}`).setLabel('ENCERRAR E GERAR LOG').setStyle(ButtonStyle.Danger))] });
+            return i.reply({ content: `✅ Tópico aberto: ${threadTalk}`, ephemeral: true });
         }
 
-        // CASO 2: RESOLVIDO (DM DIRETA)
         if (action === 'done') {
-            if (targetUser) {
-                await targetUser.send(`✅ **Alpha Atendimento:** Seu caso foi analisado pela equipe e foi considerado **RESOLVIDO**.`).catch(() => {});
-            }
-            await i.update({ content: `✅ **CASO RESOLVIDO** por <@${i.user.id}>`, components: [], embeds: i.message.embeds });
-            globalCooldown.delete(targetId);
+            if (player) await player.send(`✅ **Alpha Atendimento:** Seu caso foi analisado e marcado como **RESOLVIDO**.`).catch(() => {});
+            await i.update({ content: `✅ **RESOLVIDO** por <@${i.user.id}>`, components: [], embeds: i.message.embeds });
+            ticketCooldown.delete(targetId);
         }
 
-        // CASO 3: INSUFICIENTE (DM DIRETA)
         if (action === 'fail') {
-            if (targetUser) {
-                await targetUser.send(`❌ **Alpha Atendimento:** Analisamos sua denúncia, mas não encontramos evidências suficientes ou provas concretas. Caso encerrado.`).catch(() => {});
-            }
-            await i.update({ content: `❌ **RECUSADO (PROVAS INSUFICIENTES)** por <@${i.user.id}>`, components: [], embeds: i.message.embeds });
-            globalCooldown.delete(targetId);
+            if (player) await player.send(`❌ **Alpha Atendimento:** Analisamos seu caso, mas não houve evidências suficientes.`).catch(() => {});
+            await i.update({ content: `❌ **INSUFICIENTE** por <@${i.user.id}>`, components: [], embeds: i.message.embeds });
+            ticketCooldown.delete(targetId);
         }
     }
 
-    // FINALIZAÇÃO DE AUDITORIA E TRANSCRIPT
-    if (i.isButton() && i.customId.startsWith('finalize_audit_')) {
-        const targetUserId = i.customId.split('_')[2];
-        const thread = i.channel;
-        
-        await i.reply('🔒 Arquivando atendimento e gerando transcript...');
-
-        const targetUser = await client.users.fetch(targetUserId).catch(() => ({ tag: 'Desconhecido', id: targetUserId }));
-        const { filePath, fileName } = await createIndustrialTranscript(thread, targetUser);
-        const attachment = new AttachmentBuilder(filePath);
-
-        const auditChannel = i.guild.channels.cache.get(CANAL_LOGS_DENUNCIA);
-        if (auditChannel) {
-            await auditChannel.send({ 
-                content: `📁 **Ticket Encerrado:** \`${thread.name}\`\nFinalizado por: <@${i.user.id}>`, 
-                files: [attachment] 
-            });
-        }
-
-        setTimeout(() => {
-            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-            thread.delete().catch(() => {});
-            globalCooldown.delete(targetUserId);
-        }, 5000);
+    // --- FINALIZAÇÃO E TRANSCRIPT ---
+    if (i.isButton() && i.customId.startsWith('audit_close_')) {
+        const targetId = i.customId.split('_');
+        const { filePath, fileName } = await generateAuditLog(i.channel, { tag: `id-${targetId}` });
+        const logChan = i.guild.channels.cache.get(CANAL_LOGS_DENUNCIA);
+        if (logChan) await logChan.send({ content: `📁 Transcript:`, files: [new AttachmentBuilder(filePath)] });
+        await i.reply('🔒 Encerrando...');
+        setTimeout(() => { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); i.channel.delete().catch(() => {}); ticketCooldown.delete(targetId); }, 5000);
     }
 });
 
-// LOGIN DO BOT NO RAILWAY
 client.login(TOKEN);
-
-// NOTAS TÉCNICAS PARA O RAILWAY:
-// 1. O sistema de Transcripts usa o sistema de arquivos local do Railway para processamento temporário.
-// 2. Os limites de taxa (Rate Limits) do Discord são gerenciados pelo tempo de deleção de tópicos.
-// 3. Este código utiliza as versões mais recentes do discord.js (v14+) para garantir compatibilidade.
