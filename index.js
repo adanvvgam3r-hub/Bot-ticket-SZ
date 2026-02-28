@@ -263,11 +263,12 @@ client.on('interactionCreate', async (i) => {
         const user = await client.users.fetch(uid).catch(() => null);
 
         if (act === 'talk') {
-            const threadInteracao = await i.channel.threads.create({
-                name: `interacao-${uid}`,
-                type: ChannelType.PublicThread,
-                autoArchiveDuration: 60
-            });
+            const canalDestino = client.channels.cache.get('1476773027516518470');
+const threadInteracao = await canalDestino.threads.create({
+    name: `interacao-${uid}`,
+    type: ChannelType.PrivateThread, // Use Private para ninguém mais ver
+    autoArchiveDuration: 60
+});
             await threadInteracao.members.add(uid);
             await threadInteracao.send({ 
                 content: `👋 <@${uid}>, a Staff <@${i.user.id}> iniciou o contato.\n\n🛠️ Use para encerrar:`, 
